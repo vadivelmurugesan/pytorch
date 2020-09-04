@@ -2693,8 +2693,9 @@ struct to_ir {
 
         return std::make_shared<SimpleValue>(expr);
       }
-      case prim::rpc_async: {
-        return emitRpcAsyncExpr(apply);
+      case prim::rpc_async:
+      case prim::rpc_sync: {
+        return emitRpcExpr(apply, form);
       }
       case prim::unchecked_cast: {
         checkApplyNumInputs(apply, 2);
@@ -2971,26 +2972,28 @@ struct to_ir {
     return std::make_shared<SimpleValue>(node_output);
   }
 
-  std::shared_ptr<SugaredValue> emitRpcAsyncExpr(const Apply& apply) {
+  std::shared_ptr<SugaredValue> emitRpcExpr(const Apply& apply, Symbol rpc_op) {
     // TODO: This is a temporary apporoach to enable calling user fucntion
     // through RPC in TorchScript,
     // Ideally, function value in JIT IR is first-class citizen and
     // The RPC C++ entry API can take c10::Function directly.
     auto rpcMinInputs = 2;
     auto rpcMaxInputs = 5; // NOLINT
+    std::string op_name = rpc_op.toUnqualString();
     if (apply.inputs().size() < rpcMinInputs ||
         apply.inputs().size() > rpcMaxInputs) {
       throw ErrorReport(apply)
-          << "Possible forms of call to rpc_async(..) are\n"
-          << "rpc_async(dst_worker_name, user_callable, args, kwargs, timeout)\n"
-          << "rpc_async(dst_worker_name, user_callable, args, kwargs)\n"
-          << "rpc_async(dst_worker_name, user_callable, args)\n"
-          << "rpc_async(dst_worker_name, user_callable)\n"
+          << "Possible forms of call to " << op_name << "(..) are\n"
+          << op_name
+          << "(dst_worker_name, user_callable, args, kwargs, timeout)\n"
+          << op_name << "(dst_worker_name, user_callable, args, kwargs)\n"
+          << op_name << "(dst_worker_name, user_callable, args)\n"
+          << op_name << "(dst_worker_name, user_callable)\n"
           << "Now the number of arguments is " << apply.inputs().size();
     }
     if (apply.attributes().size() != 0) {
       throw ErrorReport(apply)
-          << "rpc_async(dst_worker_name, user_callable, args, kwargs)"
+          << op_name << "(dst_worker_name, user_callable, args, kwargs)"
           << "does not support kwargs yet";
     }
     // TODO: Make rpc_async(..) support taking kwargs,
@@ -3062,10 +3065,9 @@ struct to_ir {
     Value* userCallableQualNameValue =
         graphPtr->insertConstant(userCallableQualNameIValue, loc);
 
-    // Graph insert a Node, prim::rpc_async jit::Operator, to the Graph.
+    // Graph insert the corresponding RPC node to the graph.
     Node* rpc_async_node =
-        graphPtr->insertNode(graphPtr->create(prim::rpc_async, 1))
-            ->setSourceRange(loc);
+        graphPtr->insertNode(graphPtr->create(rpc_op, 1))->setSourceRange(loc);
     {
       WithInsertPoint insert(rpc_async_node);
       rpc_async_node->addInput(dst_worker_name_value);
