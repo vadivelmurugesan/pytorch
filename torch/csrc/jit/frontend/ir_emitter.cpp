@@ -2694,7 +2694,8 @@ struct to_ir {
         return std::make_shared<SimpleValue>(expr);
       }
       case prim::rpc_async:
-      case prim::rpc_sync: {
+      case prim::rpc_sync:
+      case prim::rpc_remote: {
         return emitRpcExpr(apply, form);
       }
       case prim::unchecked_cast: {
