@@ -6,6 +6,7 @@ import pickle
 import copy
 from torch.fx import symbolic_trace, Proxy, Node, GraphModule, DefaultDelegate
 from torch.fx.proxy import TraceError
+from torch.fx.utils import extract_module, fully_outline_module
 
 from fx.quantization import Quantizer
 
@@ -512,6 +513,54 @@ class TestFX(JitTestCase):
         for s in ['args', 'kwargs', 'uses']:
             assert s in stringed
 
+
+    @skipIfNoTorchVision
+    def test_module_qualname(self):
+        class Bar(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.rn = resnet18()
+
+            def forward(self, x):
+                return torch.neg(self.rn(x))
+
+
+        class Foo(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.bar = Bar()
+
+            def forward(self, x):
+                return 3.0 + self.bar(x)
+
+
+        f = Foo()
+        traced = symbolic_trace(f)
+
+        # print_nodes(traced.graph)
+
+        # Test extracting a single submodule from the GraphModule
+        with_extracted_module : torch.fx.GraphModule = extract_module(traced, 'bar.rn')
+        # print(with_extracted_module)
+
+        test_input = torch.randn(1, 3, 224, 224)
+        self.assertEqual(with_extracted_module(test_input), traced(test_input))
+
+        # Run the Module through ser/de, then try the same thing again
+        # Should run just fine if our serialization worked properly
+        pickled = pickle.dumps(traced)
+        loaded = pickle.loads(pickled)
+
+        loaded_with_extracted_module : torch.fx.GraphModule = extract_module(loaded, 'bar.rn')
+        # print(loaded_with_extracted_module)
+        self.assertEqual(loaded_with_extracted_module(test_input), traced(test_input))
+
+        # Now try to fully un-inline the Graph.
+        uninlined = fully_outline_module(traced)
+
+        # print(uninlined)
+
+        self.assertEqual(uninlined(test_input), traced(test_input))
 
 if __name__ == '__main__':
     run_tests()
