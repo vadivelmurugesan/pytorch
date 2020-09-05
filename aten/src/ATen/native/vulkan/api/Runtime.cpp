@@ -180,6 +180,13 @@ VkPhysicalDeviceProperties query_physical_device_properties(
   return physical_device_properties;
 }
 
+VkPhysicalDeviceMemoryProperties query_physical_device_memory_properties(
+    const VkPhysicalDevice physical_device) {
+  VkPhysicalDeviceMemoryProperties physical_device_memory_properties{};
+  vkGetPhysicalDeviceMemoryProperties(physical_device, &physical_device_memory_properties);
+  return physical_device_memory_properties;
+}
+
 uint32_t query_compute_queue_family_index(const VkPhysicalDevice physical_device) {
   uint32_t queue_family_count = 0;
   vkGetPhysicalDeviceQueueFamilyProperties(

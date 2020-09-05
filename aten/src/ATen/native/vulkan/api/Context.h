@@ -75,7 +75,7 @@ class C10_EXPORT Context final {
   Resource resource_;
 };
 
-C10_EXPORT Context& context();
+C10_EXPORT Context* context();
 
 } // namespace api
 } // namespace vulkan

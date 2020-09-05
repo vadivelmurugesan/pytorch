@@ -83,11 +83,11 @@ Context::Context(const Adapter& adapter)
       resource_(adapter.instance, adapter.physical_device, device()) {
 }
 
-Context& context() {
+Context* context() {
   Context* const context = initialize();
-  TORCH_CHECK(context, "Vulkan: Backend not available on this platform!");
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(context);
 
-  return *context;
+  return context;
 }
 
 } // namespace api
